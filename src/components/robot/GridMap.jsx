@@ -39,20 +39,25 @@ function getCellStyle(cell, heatMode, isRobot, isHovered) {
   if (isHovered && cell.state !== CELL_OBSTACLE) {
     return { outline: '1px solid rgba(0,255,255,0.7)', zIndex: 5 };
   }
-  switch (cell.state) {
-    case CELL_UNKNOWN:
-      return { backgroundColor: 'hsl(220, 22%, 17%)' };
-    case CELL_OBSTACLE:
-      return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
-    case CELL_FREE:
-      return { backgroundColor: 'hsl(200, 65%, 22%)' };
-    case CELL_VISITED: {
-      const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
-      return { backgroundColor: color };
-    }
-    default:
-      return { backgroundColor: 'hsl(220, 22%, 17%)' };
+  
+  // 1. Obstacles are always red
+  if (cell.state === CELL_OBSTACLE) {
+    return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
   }
+
+  // 2. NEW: If it's visited, apply your gradient heatmap math!
+  if (cell.visited) {
+    const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
+    return { backgroundColor: color };
+  }
+
+  // 3. Unvisited free space
+  if (cell.state === CELL_FREE) {
+    return { backgroundColor: 'hsl(200, 65%, 22%)' };
+  }
+
+  // 4. Default Unknown
+  return { backgroundColor: 'hsl(220, 22%, 17%)' };
 }
 
 // ─── Single Cell ─────────────────────────────────────────────────
@@ -184,21 +189,21 @@ export default function GridMap({ cells, activeLayer, robotX, robotY, heatMode, 
             </span>
             <span className={`
               ${hoveredCell.state === CELL_OBSTACLE ? 'neon-text-red' : ''}
-              ${hoveredCell.state === CELL_FREE ? 'text-sky-400' : ''}
+              ${hoveredCell.state === CELL_FREE && !hoveredCell.visited ? 'text-sky-400' : ''}
               ${hoveredCell.state === CELL_UNKNOWN ? 'text-muted-foreground' : ''}
-              ${hoveredCell.state === CELL_VISITED ? 'neon-text-green' : ''}
+              ${hoveredCell.visited && hoveredCell.state !== CELL_OBSTACLE ? 'neon-text-green' : ''}
             `}>
               {hoveredCell.state === CELL_OBSTACLE ? '# Obstacle' :
-               hoveredCell.state === CELL_FREE ? '. Free space' :
-               hoveredCell.state === CELL_UNKNOWN ? '? Unknown' : '✓ Visited'}
+               hoveredCell.visited ? '✓ Visited' :
+               hoveredCell.state === CELL_FREE ? '. Free space' : '? Unknown'}
             </span>
-            {hoveredCell.state === CELL_VISITED && (
+            {hoveredCell.visited && hoveredCell.state !== CELL_OBSTACLE && (
               <>
                 <span className="text-orange-400">
-                  🌡 {hoveredCell.temperature?.toFixed(1)}°C
+                  🌡 {hoveredCell.temperature?.toFixed(1) ?? 'N/A'}°C
                 </span>
                 <span className="text-sky-400">
-                  💧 {hoveredCell.humidity?.toFixed(1)}%
+                  💧 {hoveredCell.humidity?.toFixed(1) ?? 'N/A'}%
                 </span>
               </>
             )}
