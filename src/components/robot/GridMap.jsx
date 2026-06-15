@@ -29,7 +29,6 @@ function temperatureColor(temp, humidity, heatMode) {
 }
 
 function getCellStyle(cell, heatMode, isRobot, isHovered) {
-  // 1. Robot styling
   if (isRobot) {
     return {
       backgroundColor: '#00ffff',
@@ -37,31 +36,23 @@ function getCellStyle(cell, heatMode, isRobot, isHovered) {
       zIndex: 10,
     };
   }
-  
-  // 2. Hover styling
   if (isHovered && cell.state !== CELL_OBSTACLE) {
     return { outline: '1px solid rgba(0,255,255,0.7)', zIndex: 5 };
   }
-
-  // 3. Obstacles are ALWAYS dark red
-  if (cell.state === CELL_OBSTACLE) {
-    return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
+  switch (cell.state) {
+    case CELL_UNKNOWN:
+      return { backgroundColor: 'hsl(220, 22%, 17%)' };
+    case CELL_OBSTACLE:
+      return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
+    case CELL_FREE:
+      return { backgroundColor: 'hsl(200, 65%, 22%)' };
+    case CELL_VISITED: {
+      const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
+      return { backgroundColor: color };
+    }
+    default:
+      return { backgroundColor: 'hsl(220, 22%, 17%)' };
   }
-
-  // 4. NEW: If the robot visited this space, use your custom heatmap gradients!
-  if (cell.visited) {
-    // If the sensor was null, we safely default to 22C or 55% so the math doesn't crash
-    const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
-    return { backgroundColor: color };
-  }
-
-  // 5. Unvisited free spaces
-  if (cell.state === CELL_FREE) {
-    return { backgroundColor: 'hsl(200, 65%, 22%)' };
-  }
-
-  // 6. Default (Unknown spaces)
-  return { backgroundColor: 'hsl(220, 22%, 17%)' };
 }
 
 // ─── Single Cell ─────────────────────────────────────────────────
