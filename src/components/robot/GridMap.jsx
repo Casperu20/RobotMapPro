@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { CELL_UNKNOWN, CELL_OBSTACLE, CELL_FREE, CELL_VISITED, GRID_SIZE } from '@/lib/robotDataService';
-
 // ─── Color helpers ────────────────────────────────────────────────
 function temperatureColor(temp, humidity, heatMode) {
   if (heatMode === 'temperature') {
@@ -30,6 +29,7 @@ function temperatureColor(temp, humidity, heatMode) {
 }
 
 function getCellStyle(cell, heatMode, isRobot, isHovered) {
+  // 1. Robot styling
   if (isRobot) {
     return {
       backgroundColor: '#00ffff',
@@ -37,23 +37,31 @@ function getCellStyle(cell, heatMode, isRobot, isHovered) {
       zIndex: 10,
     };
   }
+  
+  // 2. Hover styling
   if (isHovered && cell.state !== CELL_OBSTACLE) {
     return { outline: '1px solid rgba(0,255,255,0.7)', zIndex: 5 };
   }
-  switch (cell.state) {
-    case CELL_UNKNOWN:
-      return { backgroundColor: 'hsl(220, 22%, 17%)' };
-    case CELL_OBSTACLE:
-      return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
-    case CELL_FREE:
-      return { backgroundColor: 'hsl(200, 65%, 22%)' };
-    case CELL_VISITED: {
-      const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
-      return { backgroundColor: color };
-    }
-    default:
-      return { backgroundColor: 'hsl(220, 22%, 17%)' };
+
+  // 3. Obstacles are ALWAYS dark red
+  if (cell.state === CELL_OBSTACLE) {
+    return { backgroundColor: '#7f1a1a', boxShadow: 'inset 0 0 3px rgba(255,40,40,0.3)' };
   }
+
+  // 4. NEW: If the robot visited this space, use your custom heatmap gradients!
+  if (cell.visited) {
+    // If the sensor was null, we safely default to 22C or 55% so the math doesn't crash
+    const color = temperatureColor(cell.temperature ?? 22, cell.humidity ?? 55, heatMode);
+    return { backgroundColor: color };
+  }
+
+  // 5. Unvisited free spaces
+  if (cell.state === CELL_FREE) {
+    return { backgroundColor: 'hsl(200, 65%, 22%)' };
+  }
+
+  // 6. Default (Unknown spaces)
+  return { backgroundColor: 'hsl(220, 22%, 17%)' };
 }
 
 // ─── Single Cell ─────────────────────────────────────────────────
@@ -104,7 +112,7 @@ function MapLegend({ heatMode }) {
 }
 
 // ─── Main Grid Map ────────────────────────────────────────────────
-export default function GridMap({ cells, robotX, robotY, heatMode, onHeatModeChange }) {
+export default function GridMap({ cells, activeLayer, robotX, robotY, heatMode, onHeatModeChange }) {
   const [hoveredCell, setHoveredCell] = useState(null);
 
   const cellMap = useMemo(() => {
@@ -116,6 +124,31 @@ export default function GridMap({ cells, robotX, robotY, heatMode, onHeatModeCha
   const handleHover = useCallback((cell) => {
     setHoveredCell(cell);
   }, []);
+
+  // Translates sensor numbers into dynamic colors
+  const getCellColor = (cell, currentLayer) => {
+    if (cell.state === '#') return '#ef4444'; // Obstacles are Red
+    if (!cell.visited) return 'transparent';  // Unvisited cells are empty
+
+    if (currentLayer === 'temp' && typeof cell.temperature === 'number') {
+      const t = cell.temperature;
+      if (t < 22) return '#3b82f6';
+      if (t < 24) return '#22c55e';
+      if (t < 26) return '#eab308';
+      if (t < 28) return '#f97316';
+      return '#dc2626';
+    }
+
+    if (currentLayer === 'humidity' && typeof cell.humidity === 'number') {
+      const h = cell.humidity;
+      if (h < 40) return '#bae6fd';
+      if (h < 50) return '#38bdf8';
+      if (h < 60) return '#0284c7';
+      return '#082f49';
+    }
+
+    return '#06b6d4'; // Default fallback Cyan
+  };
 
   return (
     <div className="flex flex-col gap-3 h-full">
