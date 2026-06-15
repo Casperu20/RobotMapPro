@@ -110,30 +110,6 @@ export async function subscribeToMetrics(callback) {
   return () => supabase.removeChannel(channel);
 }
 
-// 3. Live Metrics Card Feed Subscription
-export async function subscribeToMetrics(callback) {
-  const channel = supabase
-    .channel('live-metrics')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'grid_cells' }, (payload) => {
-      const updated = payload.new;
-      if (updated) {
-        callback({
-          robotX: updated.x,
-          robotY: updated.y,
-          temperature: updated.temperature ?? 0,
-          humidity: updated.humidity ?? 0,
-          battery: 80,
-          signal: 100,
-          speed: 0.4,
-          timestamp: updated.updated_at
-        });
-      }
-    })
-    .subscribe();
-
-  return () => supabase.removeChannel(channel);
-}
-
 // 4. Live Map Tiles Sync Subscription
 export async function subscribeToGridUpdates(callback) {
   const channel = supabase
