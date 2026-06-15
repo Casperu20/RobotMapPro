@@ -58,19 +58,19 @@ export async function fetchGridData() {
   return fullGrid;
 }
 
-// 2. Fetch Latest Metrics (FILTERING OUT EMPTY SENSORS)
+// 2. Fetch Latest Metrics card values from grid_cells (USING LIVE COLUMNS)
 export async function fetchLatestMetrics() {
   const { data, error } = await supabase
     .from('grid_cells')
     .select('*')
-    .not('temperature', 'is', null) // <-- Ensure we only pull rows with valid DHT11 readings
+    .not('temperature', 'is', null)
     .order('updated_at', { ascending: false })
     .limit(1)
     .single();
 
   if (error || !data) {
     return {
-      robotX: 30, robotY: 30, temperature: 0, humidity: 0, battery: 80, signal: 100, speed: 0, timestamp: new Date().toISOString()
+      robotX: 30, robotY: 30, temperature: 0, humidity: 0, battery: 100, signal: 100, speed: 0, timestamp: new Date().toISOString()
     };
   }
 
@@ -79,11 +79,35 @@ export async function fetchLatestMetrics() {
     robotY: data.y,
     temperature: data.temperature ?? 0,
     humidity: data.humidity ?? 0,
-    battery: 80,
-    signal: 100,
-    speed: 0.4,
+    battery: data.battery ?? 100,  // <-- Uses real column now
+    signal: data.signal ?? 90,     // <-- Uses real column now
+    speed: data.speed ?? 0,        // <-- Uses real column now
     timestamp: data.updated_at
   };
+}
+
+// 3. Live Metrics Card Feed Subscription (USING LIVE COLUMNS)
+export async function subscribeToMetrics(callback) {
+  const channel = supabase
+    .channel('live-metrics')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'grid_cells' }, (payload) => {
+      const updated = payload.new;
+      if (updated) {
+        callback({
+          robotX: updated.x,
+          robotY: updated.y,
+          temperature: updated.temperature ?? 0,
+          humidity: updated.humidity ?? 0,
+          battery: updated.battery ?? 100,  // <-- Uses real column now
+          signal: updated.signal ?? 90,     // <-- Uses real column now
+          speed: updated.speed ?? 0,        // <-- Uses real column now
+          timestamp: updated.updated_at
+        });
+      }
+    })
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
 }
 
 // 3. Live Metrics Card Feed Subscription
