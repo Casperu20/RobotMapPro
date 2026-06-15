@@ -11,50 +11,35 @@ export const CELL_VISITED   = '';
 
 // ─── Supabase fetchers ────────────────────────────────────────────
 
-// 1. Fetch entire initial layout directly from grid_cells (WITH PADDING)
+// 1. Fetch entire initial layout directly from grid_cells
 export async function fetchGridData() {
-  const { data, error } = await supabase
-    .from('grid_cells')
-    .select('*');
+  const { data, error } = await supabase.from('grid_cells').select('*');
+  if (error) return [];
 
-  if (error) {
-    console.error("Error fetching grid data:", error);
-    return [];
-  }
-
-  // Create a dictionary of existing cells for fast lookup
   const dbCellMap = {};
-  (data || []).forEach(cell => {
-    dbCellMap[`${cell.x},${cell.y}`] = cell;
-  });
+  (data || []).forEach(cell => { dbCellMap[`${cell.x},${cell.y}`] = cell; });
 
-  // Build a complete 61x61 array so the CSS Grid layout stays perfectly rigid
   const fullGrid = [];
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       const dbCell = dbCellMap[`${x},${y}`];
-      
       if (dbCell) {
-        // If the robot has data for this coordinate, use it
         fullGrid.push({
           ...dbCell,
           row: dbCell.y,
           col: dbCell.x,
           state: dbCell.state === 'obstacle' ? CELL_OBSTACLE : (dbCell.state === 'free' ? CELL_FREE : CELL_UNKNOWN),
+          visited: dbCell.visited === true, // <-- NEW: Tell the UI it was visited!
           temperature: dbCell.temperature,
           humidity: dbCell.humidity
         });
       } else {
-        // If the robot hasn't been here yet, render an empty 'Unknown' space
         fullGrid.push({
-          row: y,
-          col: x,
-          state: CELL_UNKNOWN
+          row: y, col: x, state: CELL_UNKNOWN, visited: false // <-- NEW
         });
       }
     }
   }
-  
   return fullGrid;
 }
 
@@ -117,19 +102,17 @@ export async function subscribeToGridUpdates(callback) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'grid_cells' }, (payload) => {
       const updated = payload.new;
       if (updated) {
-        // Remap incoming real-time updates to match UI elements
         callback({
           eventType: payload.eventType,
           new: {
             ...updated,
             row: updated.y,
             col: updated.x,
-            state: updated.state === 'obstacle' ? CELL_OBSTACLE : (updated.state === 'free' ? CELL_FREE : CELL_UNKNOWN)
+            state: updated.state === 'obstacle' ? CELL_OBSTACLE : (updated.state === 'free' ? CELL_FREE : CELL_UNKNOWN),
+            visited: updated.visited === true // <-- NEW: Live update visited status
           }
         });
       }
-    })
-    .subscribe();
-
+    }).subscribe();
   return () => supabase.removeChannel(channel);
 }
